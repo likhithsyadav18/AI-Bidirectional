@@ -162,9 +162,51 @@ def aStarSearch(problem, heuristic=nullHeuristic):
     return graphTreeSearch(problem, priority_queue, 'a*s', heuristic)
     # util.raiseNotDefined()
 
-
 # Abbreviations
 bfs = breadthFirstSearch
 dfs = depthFirstSearch
 astar = aStarSearch
 ucs = uniformCostSearch
+
+#################################################################
+'''
+Here is the implementation done for the team project part. 
+
+Project topic 1. Bi-directional search
+Reference Paper: Bidirectional Search That Is Guaranteed to Meet in the Middle
+'''
+#################################################################
+
+
+def graphTreeBiSearch(problem, fringe_forward, fringe_backward, search_type, heuristic):
+    startingNode = problem.getStartState()
+    endingNode = problem.getGoalState()
+
+    if startingNode == endingNode:
+        return []
+    
+    visitForwards = dict()
+    visitBackwards = dict()
+
+    '''
+    A* works using the following formula, f(n) = g(n) + h(n) where,
+    g(n) is the cost function which in terms of code is given by problem.getCostOfActions() function
+    h(n) is the heuristic function which in terms of code is written as heuristic(state, problem)
+    '''
+    
+    fringe_forward.push((startingNode), (problem.getCostOfActions({}) + heuristic(startingNode, problem, 'endState')))
+    fringe_backward.push((endingNode), (problem.getCostOfActions({}) + heuristic(endingNode, problem, 'startState')))
+    
+    visitForwards[startingNode] = []
+    visitBackwards[endingNode] = []
+
+    U = float('inf')
+
+    while((not fringe_forward.isEmpty()) and (not fringe_backward.isEmpty()):
+          
+    pass
+
+def biDirectionalAStarSearch(problem, heuristic):
+    priority_queue_fwd = util.PriorityQueue()
+    priority_queue_bwd = util.PriorityQueue()
+    return graphTreeBiSearch(problem, priority_queue_fwd, priority_queue_bwd, heuristic)
