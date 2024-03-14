@@ -179,31 +179,125 @@ Reference Paper: Bidirectional Search That Is Guaranteed to Meet in the Middle
 
 
 def graphTreeBiSearch(problem, fringe_forward, fringe_backward, search_type, heuristic):
-    startingNode = problem.getStartState()
-    endingNode = problem.getGoalState()
+    startingNodeF = endingNodeB = problem.getStartState()
+    endingNodeF = startingNodeB = problem.getGoalState()
 
-    if startingNode == endingNode:
+    if (startingNodeF == startingNodeB):
         return []
     
-    visitForwards = dict()
-    visitBackwards = dict()
+    opensetForwards = dict()            #Open set of unvisited nodes for forward search
+    closedsetForwards = dict()          #Closed set of visited nodes for forward search
+
+    opensetBackwards = dict()           #Open set of unvisited nodes for forward search
+    closedsetBackwards = dict()         #Closed set of visited nodes for backward search
+
+    # '''
+    # A* works using the following formula, f(n) = g(n) + h(n) where,
+    # f(n) is the total cost estimate of the optimal path.
+    # g(n) is the actual cost function of the path to node 'n' which in terms of code is given by problem.getCostOfActions() function
+    # h(n) is the heuristic function of the path to node 'n' which in terms of code is written as heuristic(state, problem)
+    #
+    # So, for a bidirectional search node should have following properties:
+    #   {Node Value(n), Node Path(actions), Cost value(g(n)), Heuristic Value(h(n)), Priority Value} within a priority queue.
+    # '''
+    
+    nodeProperties = dict()
+
+    # For forward search
+    closedsetForwards[startingNodeF] = 0
+
+    nodeProperties[startingNodeF] = {
+        'actions': [],
+        'costValue': problem.getCostOfActions({}),
+        'heuristicValue': heuristic(startingNodeF, problem, 'False'),
+        'priority': 0
+    }
+
+    fringe_forward.push(startingNodeF, 0)
+
+
+    # For backward search
+    closedsetBackwards[startingNodeB] = 0
+
+    nodeProperties[startingNodeB] = {
+        'actions': [],
+        'costValue': problem.getCostOfActions({}),
+        'heuristicValue': heuristic(startingNodeB, problem, 'True'),
+        'priority': 0
+    }
+
+    fringe_backward.push(startingNodeB, 0)
 
     '''
-    A* works using the following formula, f(n) = g(n) + h(n) where,
-    g(n) is the cost function which in terms of code is given by problem.getCostOfActions() function
-    h(n) is the heuristic function which in terms of code is written as heuristic(state, problem)
+    U is the cost of the cheapest solution found so far in the state space.
+    Initially, the value of U is considered as infinity as there is no cost found until there is a traversal in the state space.
     '''
-    
-    fringe_forward.push((startingNode), (problem.getCostOfActions({}) + heuristic(startingNode, problem, 'endState')))
-    fringe_backward.push((endingNode), (problem.getCostOfActions({}) + heuristic(endingNode, problem, 'startState')))
-    
-    visitForwards[startingNode] = []
-    visitBackwards[endingNode] = []
-
     U = float('inf')
 
-    while((not fringe_forward.isEmpty()) and (not fringe_backward.isEmpty()):
-          
+    '''
+    Variable 'eps' is the cost of the cheapest edge in the state space. 
+    Here in the pacman domain, the edge costs are unit. So, the value of eps is considered as 1.
+    '''
+    eps = 1 
+
+    while(not fringe_forward.isEmpty()) and (not fringe_backward.isEmpty()):
+        
+        # This is for the forward search
+        curNodeF = fringe_forward.pop()
+        opensetForwards[curNodeF] = 0
+        closedsetForwards[curNodeF] = 1
+
+        # For calculating custom priority of the node using the function priority(n) = max(f(n), 2*g(n)) according to the reference algorithm.
+        fVal_Forwards = nodeProperties[curNodeF]['costValue'] + nodeProperties[curNodeF]['heuristicValue']
+        gVal_Forwards = nodeProperties[curNodeF]['costValue']
+        priorityMinForwards = max(fVal_Forwards, 2*gVal_Forwards)
+
+        # This is for the backward search
+        curNodeB = fringe_backward.pop()
+        opensetBackwards[curNodeB] = 1
+        closedsetBackwards[curNodeB] = 0
+
+        # For calculating custom priority of the node using the function priority(n) = max(f(n), 2*g(n)) according to the reference algorithm.
+        fVal_Backwards = nodeProperties[curNodeB]['costValue'] + nodeProperties[curNodeB]['heuristicValue']
+        gVal_Backwards = nodeProperties[curNodeB]['costValue']
+        priorityMinBackwards = max(fVal_Backwards, 2*gVal_Backwards)
+
+        '''
+        C is the cost of an optimal solution and it is given as C = min(priorityMinForwards, priorityMinBackwards)
+        '''
+        C = min(priorityMinForwards, priorityMinBackwards)
+
+        '''
+        U is the cost of the cheapest solution found so far. So, it is updated everytime when it satisfies the following condition.
+        if U <= max(C, fminF, fminB, gminF +gminB + eps)
+        then
+            return U
+
+        Here, max(C, fminF, fminB, gminF +gminB + eps) is lower cost bound and 'eps' is the cost of the cheapest edge in the state space.
+        '''
+        lowerCostBound = max(C, fVal_Forwards, fVal_Backwards, gVal_Forwards + gVal_Backwards + eps)
+        # if U <= lowerCostBound:
+
+        # if curNodeF not in visitedNodes:
+        #     visitedNodes.append(currentNode)
+
+        #     if problem.isGoalState(currentNode):
+        #         return actions
+            
+        #     childNodes = problem.getSuccessors(currentNode)
+        #     for nextNode, action, cost in childNodes:
+        #         newAction = actions + [action]
+                
+        #         if search_type in ['a*s', 'ucs']:
+        #             newCostToNode = prevCost + cost
+        #             if search_type == 'a*s':
+        #                 priority = newCostToNode + heuristic(nextNode, problem)
+        #             else:           # search_type == 'ucs'
+        #                 priority = newCostToNode
+        #             fringe.push((nextNode, newAction, newCostToNode), priority)
+        #         else:   # search_type == 'dfs' and 'bfs'
+        #             fringe.push((nextNode, newAction))
+
     pass
 
 def biDirectionalAStarSearch(problem, heuristic):
