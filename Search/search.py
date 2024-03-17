@@ -17,6 +17,7 @@ In search.py, you will implement generic search algorithms which are called by
 Pacman agents (in searchAgents.py).
 """
 
+from searchAgents import manhattanHeuristic
 import util
 
 class SearchProblem:
@@ -30,6 +31,12 @@ class SearchProblem:
     def getStartState(self):
         """
         Returns the start state for the search problem.
+        """
+        util.raiseNotDefined()
+
+    def getGoalState(self):
+        """
+        Returns the end state for the search problem.
         """
         util.raiseNotDefined()
 
@@ -177,12 +184,21 @@ Reference Paper: Bidirectional Search That Is Guaranteed to Meet in the Middle
 '''
 #################################################################
 
+def flipActionPath(actions):
+    directionsReverse = {'East': 'West', 'West': 'East', 'North': 'South', 'South': 'North'}
+    actionsReverse = [directionsReverse[action] for action in reversed(actions)]
+    return actionsReverse
 
 def graphTreeBiSearch(problem, fringe_forward, fringe_backward, search_type, heuristic):
     startingNodeF = endingNodeB = problem.getStartState()
     endingNodeF = startingNodeB = problem.getGoalState()
 
-    if (startingNodeF == startingNodeB):
+    if search_type == 'MM0':
+        heuristic = nullHeuristic
+    else:
+        heuristic = manhattanHeuristic
+
+    if ((startingNodeF == startingNodeB) or (endingNodeF == endingNodeB)):
         return []
     
     opensetForwards = dict()            #Open set of unvisited nodes for forward search
@@ -200,16 +216,19 @@ def graphTreeBiSearch(problem, fringe_forward, fringe_backward, search_type, heu
     # So, for a bidirectional search node should have following properties:
     #   {Node Value(n), Node Path(actions), Cost value(g(n)), Heuristic Value(h(n)), Priority Value} within a priority queue.
     # '''
-    
+    flipHeuristic = {}
+
     nodeProperties = dict()
 
     # For forward search
     closedsetForwards[startingNodeF] = 0
 
+    flipHeuristic['flip'] = 'False'
+
     nodeProperties[startingNodeF] = {
         'actions': [],
         'costValue': problem.getCostOfActions([]),
-        'heuristicValue': heuristic(startingNodeF, problem, 'False'),
+        'heuristicValue': heuristic(startingNodeF, problem, flipHeuristic),
         'totalCostValue': 0,
         'priority': 0
     }
@@ -220,10 +239,12 @@ def graphTreeBiSearch(problem, fringe_forward, fringe_backward, search_type, heu
     # For backward search
     closedsetBackwards[startingNodeB] = 0
 
+    flipHeuristic['flip'] = 'True'
+
     nodeProperties[startingNodeB] = {
         'actions': [],
         'costValue': problem.getCostOfActions([]),
-        'heuristicValue': heuristic(startingNodeB, problem, 'True'),
+        'heuristicValue': heuristic(startingNodeB, problem, flipHeuristic),
         'totalCostValue': 0,
         'priority': 0
     }
@@ -246,6 +267,9 @@ def graphTreeBiSearch(problem, fringe_forward, fringe_backward, search_type, heu
     For tracing the resultant path, we have considered a list named actionPath.
     '''
     actionPath = list()
+
+    recentNodeB = None
+    recentNodeF = None
 
     while(not fringe_forward.isEmpty()) and (not fringe_backward.isEmpty()):
         
@@ -291,7 +315,7 @@ def graphTreeBiSearch(problem, fringe_forward, fringe_backward, search_type, heu
             return actionPath
         
         if (C == priorityMinForwards):
-            endingNodeF = curNodeF
+            recentNodeF = curNodeF
 
             opensetForwards[curNodeF] = 0
             closedsetForwards[curNodeF] = 1
@@ -305,9 +329,11 @@ def graphTreeBiSearch(problem, fringe_forward, fringe_backward, search_type, heu
                 if (nextChildNodeF in opensetForwards):
                     nextNodeF = fringe_forward[nextChildNodeF]
                     closedsetForwards[nextChildNodeF] = 0
+
                 elif (nextChildNodeF in closedsetForwards):
                     nextNodeF = fringe_forward[nextChildNodeF]
                     closedsetForwards[nextChildNodeF] = 0
+
                 else:
                     nextNodeF = None
 
@@ -316,14 +342,14 @@ def graphTreeBiSearch(problem, fringe_forward, fringe_backward, search_type, heu
                         continue
 
                     nodeProperties[nextNodeF]['costValue'] = nodeProperties[curNodeF]['costValue'] + costChildNodeF
-                    nodeProperties[nextNodeF]['heuristicValue'] = heuristic(nextNodeF, problem, 'False')
+                    nodeProperties[nextNodeF]['heuristicValue'] = heuristic(nextNodeF, problem)
                     nodeProperties[nextNodeF]['totalCostValue'] = nodeProperties[nextNodeF]['costValue'] + nodeProperties[nextNodeF]['heuristicValue']
                     nodeProperties[nextNodeF]['actions'] = list(nodeProperties[curNodeF]['actions']) + [actionChildNodeF]
                     nodeProperties[nextNodeF]['priority'] = max( nodeProperties[nextNodeF]['totalCostValue'], 2 * nodeProperties[nextNodeF]['costValue'])
                     
                 else:
                     nodeProperties[nextChildNodeF]['costValue'] = nodeProperties[curNodeF]['costValue'] + costChildNodeF
-                    nodeProperties[nextChildNodeF]['heuristicValue'] = heuristic(nextChildNodeF, problem, 'False')
+                    nodeProperties[nextChildNodeF]['heuristicValue'] = heuristic(nextChildNodeF, problem)
                     nodeProperties[nextChildNodeF]['totalCostValue'] = nodeProperties[nextChildNodeF]['costValue'] + nodeProperties[nextChildNodeF]['heuristicValue']
                     nodeProperties[nextChildNodeF]['actions'] = list(nodeProperties[curNodeF]['actions']) + [actionChildNodeF]
                     nodeProperties[nextChildNodeF]['priority'] = max( nodeProperties[nextChildNodeF]['totalCostValue'], 2 * nodeProperties[nextChildNodeF]['costValue'])
@@ -335,13 +361,75 @@ def graphTreeBiSearch(problem, fringe_forward, fringe_backward, search_type, heu
                 opensetForwards[nextNodeF] = 1
 
                 if (nextChildNodeF in opensetBackwards):
-                    nextNodeB = fringe_backward[nextChildNodeF]                ####Currently solving this
-                    # U = min(U, nodeProperties[nextNodeB]['costValue'] + nodeProperties[c][G_VALUE])
-                    # MIDDLE_NODE = (c, cGNew, backwardNodeMetaData[c][G_VALUE])
-                    # FINAL_ACTION = forwardNodeMetaData[c][ACTION] + toggleDirectionForActions(backwardNodeMetaData[c][ACTION])
-    pass
+                    nextNodeB = fringe_backward[nextChildNodeF]                
+                    U = min(U, nodeProperties[nextNodeF]['costValue'] + nodeProperties[nextNodeB]['costValue'])
+                    actionPath = list(nodeProperties[nextNodeF]['actions']) + flipActionPath(nodeProperties[nextNodeB]['actions'])
+        
+        else:
+            recentNodeB = curNodeB
+
+            opensetBackwards[curNodeB] = 0
+            closedsetBackwards[curNodeB] = 1
+            opensetForwards[curNodeF] = 1
+
+            fringe_forward.push(curNodeF, priorityMinForwards)
+            
+            childNodesB = problem.getSuccessors(curNodeB)
+            for nextChildNodeB, actionChildNodeB, costChildNodeB in childNodesB:
+
+                if (nextChildNodeB in opensetBackwards):
+                    nextNodeB = fringe_backward[nextChildNodeB]
+                    closedsetBackwards[nextChildNodeB] = 0
+                
+                elif (nextChildNodeB in opensetBackwards):
+                    nextNodeB = fringe_backward[nextChildNodeB]
+                    closedsetBackwards[nextChildNodeB] = 0
+
+                else:
+                    nextNodeB = None
+
+                if nextNodeB is not None:
+                    if (nodeProperties[nextNodeB]['costValue'] <= nodeProperties[curNodeB]['costValue'] + costChildNodeB):
+                        continue
+
+                    nodeProperties[nextNodeB]['costValue'] = nodeProperties[curNodeB]['costValue'] + costChildNodeB
+                    nodeProperties[nextNodeB]['heuristicValue'] = heuristic(nextNodeB, problem)
+                    nodeProperties[nextNodeB]['totalCostValue'] = nodeProperties[nextNodeB]['costValue'] + nodeProperties[nextNodeB]['heuristicValue']
+                    nodeProperties[nextNodeB]['actions'] = list(nodeProperties[curNodeB]['actions']) + [actionChildNodeB]
+                    nodeProperties[nextNodeB]['priority'] = max( nodeProperties[nextNodeB]['totalCostValue'], 2 * nodeProperties[nextNodeB]['costValue'])
+                    
+                else:
+                    nodeProperties[nextChildNodeB]['costValue'] = nodeProperties[curNodeB]['costValue'] + costChildNodeB
+                    nodeProperties[nextChildNodeB]['heuristicValue'] = heuristic(nextChildNodeB, problem)
+                    nodeProperties[nextChildNodeB]['totalCostValue'] = nodeProperties[nextChildNodeB]['costValue'] + nodeProperties[nextChildNodeB]['heuristicValue']
+                    nodeProperties[nextChildNodeB]['actions'] = list(nodeProperties[curNodeB]['actions']) + [actionChildNodeB]
+                    nodeProperties[nextChildNodeB]['priority'] = max( nodeProperties[nextChildNodeB]['totalCostValue'], 2 * nodeProperties[nextChildNodeB]['costValue'])
+
+                    fringe_backward.push(nextChildNodeB, nodeProperties[nextChildNodeB]['priority'])
+
+
+                fringe_backward.push(nextNodeB, nodeProperties[nextNodeB]['priority'])
+                opensetBackwards[nextNodeB] = 1
+
+                if (nextChildNodeB in opensetForwards):
+                    nextNodeF = fringe_forward[nextChildNodeB]                
+                    U = min(U, nodeProperties[nextNodeB]['costValue'] + nodeProperties[nextNodeF]['costValue'])
+                    actionPath = list(nodeProperties[nextNodeB]['actions']) + flipActionPath(nodeProperties[nextNodeF]['actions'])
+
+    return nodeProperties[recentNodeF]['actions'] + flipActionPath(nodeProperties[recentNodeB]['actions']) if ((recentNodeB is not None) and (recentNodeF is not None)) else []
+
 
 def biDirectionalAStarSearch(problem, heuristic):
     priority_queue_fwd = util.PriorityQueue()
     priority_queue_bwd = util.PriorityQueue()
-    return graphTreeBiSearch(problem, priority_queue_fwd, priority_queue_bwd, heuristic)
+    return graphTreeBiSearch(problem, priority_queue_fwd, priority_queue_bwd, 'MM', heuristic)
+
+def biDirectionalAStarSearchBruteForce(problem, heuristic):
+    # biDirectionalAStarSearchBruteForce is biDirectionalAStarSearch with null heuristic.
+    priority_queue_fwd = util.PriorityQueue()
+    priority_queue_bwd = util.PriorityQueue()
+    return graphTreeBiSearch(problem, priority_queue_fwd, priority_queue_bwd, 'MM0', heuristic)
+
+# Abbreviations
+bds_mm0 = biDirectionalAStarSearchBruteForce
+bds_mm = biDirectionalAStarSearch

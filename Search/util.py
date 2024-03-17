@@ -190,6 +190,31 @@ class PriorityQueue:
     def isEmpty(self):
         return len(self.heap) == 0
 
+    def peek(self):
+        return self.heap[0][2]
+
+    def remove(self, element):
+        """Need to pop element by position for Bi-Directional Search"""
+        i = None
+        tmpList = self.asList()
+        for idx, item in enumerate(tmpList):
+            if item.state == element.state:
+                i = idx
+                break
+        if i != None:
+            self.heap[i]=self.heap[-1]
+            self.heap.pop(-1)
+            heapq.heapify(self.heap)
+        #     self.heap = []
+        #     self.count = 0
+        #     for idx, elem in enumerate(tmpList):
+        #         if idx != i:
+        #             self.push(elem, elem.priority())
+
+    def asList(self):
+        """Need to iterate over to find if a state exists or not"""
+        return [entry[2] for entry in self.heap]
+
     def update(self, item, priority):
         # If item already in priority queue with higher priority, update its priority and rebuild the heap.
         # If item already in priority queue with equal or lower priority, do nothing.

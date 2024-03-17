@@ -167,8 +167,14 @@ class PositionSearchProblem(search.SearchProblem):
     def getStartState(self):
         return self.startState
 
-    def isGoalState(self, state):
-        isGoal = state == self.goal
+    def getGoalState(self):
+        return self.goal
+
+    def isGoalState(self, state, nodesVisited = None):
+        if nodesVisited is not None:
+            isGoal = state in nodesVisited      # Checks whether the current state is met in the middle of a Bidirectional search
+        else:
+            isGoal = state == self.goal
 
         # For display purposes only
         if isGoal and self.visualize:
@@ -210,13 +216,22 @@ class PositionSearchProblem(search.SearchProblem):
 
         return successors
 
-    def getCostOfActions(self, actions):
+    def getBiDirectionalSuccessors(self, state):
+        childStates = self.getSuccessors(state)
+        return childStates
+    
+    def getCostOfActions(self, actions, direction):
         """
         Returns the cost of a particular sequence of actions. If those actions
         include an illegal move, return 999999.
         """
         if actions == None: return 999999
-        x,y= self.getStartState()
+
+        if direction == 'backwards':
+            x, y = self.getGoalState()
+        else:
+            x, y = self.getStartState()
+
         cost = 0
         for action in actions:
             # Check figure out the next state and see whether its' legal
@@ -253,13 +268,15 @@ class StayWestSearchAgent(SearchAgent):
 def manhattanHeuristic(position, problem, info={}):
     "The Manhattan distance heuristic for a PositionSearchProblem"
     xy1 = position
-    xy2 = problem.goal
+    xy2 = problem.goal if info.get('flip', False) else problem.startState
+
     return abs(xy1[0] - xy2[0]) + abs(xy1[1] - xy2[1])
 
 def euclideanHeuristic(position, problem, info={}):
     "The Euclidean distance heuristic for a PositionSearchProblem"
     xy1 = position
-    xy2 = problem.goal
+    xy2 = problem.goal if info.get('flip', False) else problem.startState
+
     return ( (xy1[0] - xy2[0]) ** 2 + (xy1[1] - xy2[1]) ** 2 ) ** 0.5
 
 #####################################################
@@ -305,6 +322,15 @@ class CornersProblem(search.SearchProblem):
         "*** YOUR CODE HERE ***"
         return(self.startingPosition, self.cornersVisited)
         # util.raiseNotDefined()
+
+    def manhattanDistance(a, b):
+        dist = abs(b[0] - a[0]) + abs(b[1] - a[1])
+        return dist
+    
+    def getGoalState(self):
+        distantCorner = max(self.corners, key=lambda corner: self.manhattanDistance(self.startingPosition, corner))
+        cornersVisited = tuple(True for _ in self.corners)
+        return (distantCorner, cornersVisited)
 
     def isGoalState(self, state):
         """
@@ -363,6 +389,27 @@ class CornersProblem(search.SearchProblem):
         self._expanded += 1 # DO NOT CHANGE
         return successors
 
+    def getBiDirectionalSuccessors(self, state):
+        successors = []
+        for action in [Directions.NORTH, Directions.SOUTH, Directions.EAST, Directions.WEST]:
+            x, y = state[0]
+            visitedCorners = state[1]
+            newCornerState = []
+
+            dx, dy = Actions.directionToVector(action)
+            nextx, nexty = int(x + dx), int(y + dy)
+            next_node = tuple(nextx, nexty)
+            hitsWall = self.walls[nextx][nexty]
+            if not hitsWall:
+                pacPos = (x, y)
+                if pacPos in self.corners and next_node not in self.corners:
+                    idx = self.corners.index(pacPos)
+                    newCornerState = tuple(False if index == idx else value for index, value in enumerate(visitedCorners))
+
+                successors.append(((next_node, newCornerState), action, 1))
+        self._expanded += 1 # DO NOT CHANGE
+        return successors
+
     def getCostOfActions(self, actions):
         """
         Returns the cost of a particular sequence of actions.  If those actions
@@ -393,16 +440,18 @@ def cornersHeuristic(state, problem):
     corners = problem.corners # These are the corner coordinates
     walls = problem.walls # These are the walls of the maze, as a Grid (game.py)
 
+    def calcDistance(a, b):
+        return abs(a[0] - b[0]) + abs(a[1] - b[1])
+
     "*** YOUR CODE HERE ***"
     node = state[0]
     visitedCorners = state[1]
     totalCost = 0
     for corner in visitedCorners:
         if corner[1] is False:
-            totalCost = max(totalCost, abs(state[0][0] - corner[0][0]) + abs(state[0][1] - corner[0][1]))
+            totalCost = max(totalCost, calcDistance(state[0], corner[0]))
     return totalCost
     # return 0 # Default to trivial solution
-
 
 class AStarCornersAgent(SearchAgent):
     "A SearchAgent for FoodSearchProblem using A* and your foodHeuristic"
@@ -429,6 +478,20 @@ class FoodSearchProblem:
     def getStartState(self):
         return self.start
 
+    def getGoalState(self):
+        foodLocations = self.start[1].asList()
+
+        if not foodLocations:
+            return self.start
+
+        # Heuristic 3: Find farthest food
+        distantFood = max(foodLocations, key=lambda food: mazeDistance(self.start[0], food, self.startingGameState))
+
+        # Reset food grid
+        foodGrid = [[False] * self.start[1].height for _ in range(self.start[1].width)]
+
+        return tuple((distantFood, foodGrid))
+
     def isGoalState(self, state):
         return state[1].count() == 0
 
@@ -443,6 +506,21 @@ class FoodSearchProblem:
             if not self.walls[nextx][nexty]:
                 nextFood = state[1].copy()
                 nextFood[nextx][nexty] = False
+                successors.append( ( ((nextx, nexty), nextFood), direction, 1) )
+        return successors
+
+    # Successor Function for Bi Directional Search
+    def getBiDirectionalSuccessors(self, state):
+        "Returns successor states, the actions they require, and a cost of 1."
+        successors = []
+        self._expanded += 1 # DO NOT CHANGE
+        for direction in [Directions.NORTH, Directions.SOUTH, Directions.EAST, Directions.WEST]:
+            x,y = state[0]
+            dx, dy = Actions.directionToVector(direction)
+            nextx, nexty = int(x + dx), int(y + dy)
+            if not self.walls[nextx][nexty]:
+                nextFood = state[1].copy()
+                nextFood[nextx][nexty] = self.heuristicInfo['foodGrid'][nextx][nexty]
                 successors.append( ( ((nextx, nexty), nextFood), direction, 1) )
         return successors
 
