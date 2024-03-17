@@ -9,7 +9,7 @@ if not isExist:
    print("The new directory is created!")
 else:
     print("The directory Exists!")
-algorithm=["bfs","dfs","ucs","astar,heuristic=manhattanHeuristic","bd,heuristic=manhattanHeuristic","bd0"]
+algorithm=["bfs","dfs","ucs","astar,heuristic=manhattanHeuristic","bds_mm,heuristic=manhattanHeuristic","bds_mm0"]
 mazes=["contoursMaze","openMaze", "smallMaze","mediumMaze"]
 # for each maze in mazes
 k=0
